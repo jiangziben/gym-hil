@@ -35,21 +35,21 @@ from gymnasium.envs.registration import register
 register(
     id="gym_hil/PandaPickCubeBase-v0",  # This is the base environment
     entry_point="gym_hil.envs:PandaPickCubeGymEnv",
-    max_episode_steps=100,
+    max_episode_steps=1000,
 )
 
 # Register the viewer wrapper
 register(
     id="gym_hil/PandaPickCubeViewer-v0",
     entry_point=lambda **kwargs: PassiveViewerWrapper(gym.make("gym_hil/PandaPickCubeBase-v0", **kwargs)),
-    max_episode_steps=100,
+    max_episode_steps=1000,
 )
 
 # Register wrapped versions using the factory - NOTE: these now use PandaPickCubeBase-v0
 register(
     id="gym_hil/PandaPickCube-v0",
     entry_point="gym_hil.wrappers.factory:make_env",
-    max_episode_steps=100,
+    max_episode_steps=1000,
     kwargs={
         "env_id": "gym_hil/PandaPickCubeBase-v0",  # Use the base environment
     },
@@ -58,7 +58,7 @@ register(
 register(
     id="gym_hil/PandaPickCubeGamepad-v0",
     entry_point="gym_hil.wrappers.factory:make_env",
-    max_episode_steps=100,
+    max_episode_steps=1000,
     kwargs={
         "env_id": "gym_hil/PandaPickCubeBase-v0",  # Use the base environment
         "use_viewer": True,
@@ -69,10 +69,34 @@ register(
 register(
     id="gym_hil/PandaPickCubeKeyboard-v0",
     entry_point="gym_hil.wrappers.factory:make_env",
-    max_episode_steps=100,
+    max_episode_steps=1000,
     kwargs={
         "env_id": "gym_hil/PandaPickCubeBase-v0",  # Use the base environment
         "use_viewer": True,
         "gripper_penalty": -0.05,
+    },
+)
+register(
+    id="gym_hil/ChargingTaskGamepad-v0",
+    entry_point="gym_hil.wrappers.factory:make_env",
+    max_episode_steps=1000,
+    kwargs={
+        "env_id": "gym_hil/ChargingTask-v0",  # Use the base environment
+        "use_viewer": False,
+        "use_gamepad": True,
+        "use_gripper": False,
+        "obs_mode" : "rgb",
+        "reward_mode": "sparse"
+    },
+)
+register(
+    id="gym_hil/ChargingTaskKeyboard-v0",
+    entry_point="gym_hil.wrappers.factory:make_env",
+    max_episode_steps=1000,
+    kwargs={
+        "env_id": "gym_hil/ChargingTask-v0",  # Use the base environment
+        "use_viewer": False,
+        "use_gripper": False,
+        "use_gamepad": False,
     },
 )

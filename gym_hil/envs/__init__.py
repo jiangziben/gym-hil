@@ -15,7 +15,9 @@
 # limitations under the License.
 
 from gym_hil.envs.panda_pick_gym_env import PandaPickCubeGymEnv
+from gym_hil.envs.charging_task_gym_env import ChargingTaskEnv
 
 __all__ = [
     "PandaPickCubeGymEnv",
+    "ChargingTaskEnv",
 ]

@@ -13,7 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import sys
+sys.path.insert(0, "/home/gsmp/extra_home/gym-hil/gym_hil")  # 放到 sys.path 最前面
 import argparse
 import time
 
@@ -21,7 +22,8 @@ import gymnasium as gym
 import numpy as np
 
 import gym_hil  # noqa: F401
-
+from gym_hil.wrappers.factory import make_env
+import torch
 
 def main():
     parser = argparse.ArgumentParser(description="Control Franka robot interactively")
@@ -42,11 +44,12 @@ def main():
     args = parser.parse_args()
 
     # Create Franka environment - Use base environment first to debug
-    env = gym.make(
-        "gym_hil/PandaPickCubeBase-v0",  # Use the base environment for debugging
-        render_mode=args.render_mode,
-        image_obs=True,
-    )
+    # env = gym.make(
+    #     "gym_hil/PandaPickCubeBase-v0",  # Use the base environment for debugging
+    #     render_mode=args.render_mode,
+    #     image_obs=True,
+    # )
+    env = gym.make("gym_hil/ChargingTaskGamepad-v0",render_mode=args.render_mode)
 
     # Print observation space for debugging
     print("Observation space:", env.observation_space)
@@ -57,44 +60,43 @@ def main():
     if "pixels" in obs:
         print("Pixels keys:", list(obs["pixels"].keys()))
 
-    # Now try with the wrapped version
-    print("\nTrying wrapped environment...")
-    env_id = "gym_hil/PandaPickCubeKeyboard-v0" if args.use_keyboard else "gym_hil/PandaPickCubeGamepad-v0"
-    env = gym.make(
-        env_id,
-        render_mode=args.render_mode,
-        image_obs=True,
-        use_gamepad=not args.use_keyboard,
-        max_episode_steps=1000,  # 100 seconds * 10Hz
-    )
+    # # Now try with the wrapped version
+    # print("\nTrying wrapped environment...")
+    # env_id = "gym_hil/ChargingTaskKeyboard-v0" if args.use_keyboard else "gym_hil/ChargingTaskGamepad-v0"
+    # env = gym.make(
+    #     env_id,
+    #     render_mode=args.render_mode,
+    #     image_obs=True,
+    #     use_gamepad=not args.use_keyboard,
+    #     max_episode_steps=1000,  # 100 seconds * 10Hz
+    # )
 
-    # Print observation space for the wrapped environment
-    print("Wrapped observation space:", env.observation_space)
+    # # Print observation space for the wrapped environment
+    # print("Wrapped observation space:", env.observation_space)
 
-    # Reset and check wrapped observation structure
-    obs, _ = env.reset()
-    print("Wrapped observation keys:", list(obs.keys()))
+    # # Reset and check wrapped observation structure
+    # obs, _ = env.reset()
+    # print("Wrapped observation keys:", list(obs.keys()))
 
     # Reset environment
     obs, _ = env.reset()
-    dummy_action = np.zeros(4, dtype=np.float32)
+    # dummy_action = np.zeros(4, dtype=np.float32)
     # This ensures the "stay gripper" action is set when the intervention button is not pressed
-    dummy_action[-1] = 1
-
+    # dummy_action[-1] = 1
+    dummy_action = torch.zeros(6, dtype=torch.float32)
     try:
         while True:
             # Step the environment
             obs, reward, terminated, truncated, info = env.step(dummy_action)
 
-            # Print some feedback
+            # # Print some feedback
             if info.get("succeed", False):
-                print("\nSuccess! Block has been picked up.")
+                print("\nSuccess!")
 
-            # If auto-reset is disabled, manually reset when episode ends
+            # # If auto-reset is disabled, manually reset when episode ends
             if terminated or truncated:
                 print("Episode ended, resetting environment")
                 obs, _ = env.reset()
-
             # Add a small delay to control update rate
             time.sleep(0.05)
 

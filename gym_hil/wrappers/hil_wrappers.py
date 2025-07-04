@@ -92,13 +92,12 @@ class EEActionWrapper(gym.ActionWrapper):
         # action between -1 and 1, scale to step_size
         action_xyz = action[:3] * self._ee_step_size
         # TODO: Extend to enable orientation control
-        actions_orn = np.zeros(3)
+        actions_orn = action[3:6]#np.zeros(3)
 
         gripper_open_command = [0.0]
         if self.use_gripper:
             # NOTE: Normalize gripper action from [0, 2] -> [-1, 1]
             gripper_open_command = [action[-1] - 1.0]
-
         action = np.concatenate([action_xyz, actions_orn, gripper_open_command])
         return action
 
@@ -116,7 +115,7 @@ class InputsControlWrapper(gym.Wrapper):
         env,
         x_step_size=1.0,
         y_step_size=1.0,
-        z_step_size=1.0,
+        z_step_size=0.5,
         use_gripper=False,
         auto_reset=False,
         input_threshold=0.001,
@@ -183,11 +182,12 @@ class InputsControlWrapper(gym.Wrapper):
 
         # Get movement deltas from the controller
         delta_x, delta_y, delta_z = self.controller.get_deltas()
+        delta_r, delta_p, delta_yaw = self.controller.get_deltas_rpy()
 
         intervention_is_active = self.controller.should_intervene()
 
         # Create action from gamepad input
-        gamepad_action = np.array([delta_x, delta_y, delta_z], dtype=np.float32)
+        gamepad_action = np.array([delta_x, delta_y, delta_z, delta_r, delta_p, delta_yaw], dtype=np.float32)
 
         if self.use_gripper:
             gripper_command = self.controller.gripper_command()

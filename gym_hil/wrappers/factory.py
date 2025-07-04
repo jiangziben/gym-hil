@@ -5,6 +5,7 @@ from typing import TypedDict
 import gymnasium as gym
 
 from gym_hil.envs.panda_pick_gym_env import PandaPickCubeGymEnv
+from gym_hil.envs.charging_task_gym_env import ChargingTaskEnv
 from gym_hil.wrappers.hil_wrappers import (
     DEFAULT_EE_STEP_SIZE,
     EEActionWrapper,
@@ -56,7 +57,7 @@ def wrap_env(
 
     if not ee_step_size:
         ee_step_size = DEFAULT_EE_STEP_SIZE
-    env = EEActionWrapper(env, ee_action_step_size=ee_step_size, use_gripper=True)
+    env = EEActionWrapper(env, ee_action_step_size=ee_step_size, use_gripper=use_gripper)
 
     # Apply control wrappers last
     env = InputsControlWrapper(
@@ -114,6 +115,8 @@ def make_env(
     # Create the base environment directly
     if env_id == "gym_hil/PandaPickCubeBase-v0":
         env = PandaPickCubeGymEnv(**kwargs)
+    elif env_id == "gym_hil/ChargingTask-v0":
+        env = ChargingTaskEnv(**kwargs)
     else:
         raise ValueError(f"Environment ID {env_id} not supported")
 
