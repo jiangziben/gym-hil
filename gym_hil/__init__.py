@@ -86,17 +86,8 @@ register(
         "use_gamepad": True,
         "use_gripper": False,
         "obs_mode" : "rgb",
-        "reward_mode": "sparse"
-    },
-)
-register(
-    id="gym_hil/ChargingTaskKeyboard-v0",
-    entry_point="gym_hil.wrappers.factory:make_env",
-    max_episode_steps=1000,
-    kwargs={
-        "env_id": "gym_hil/ChargingTask-v0",  # Use the base environment
-        "use_viewer": False,
-        "use_gripper": False,
-        "use_gamepad": False,
+        "reward_mode": "sparse",
+        "image_obs": True,
+        "render_mode": "rgb_array"
     },
 )

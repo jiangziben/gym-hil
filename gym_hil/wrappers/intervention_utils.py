@@ -426,7 +426,7 @@ class GamepadController(InputController):
 
             # Apply inversion if configured
             if invert_right_x:
-                r_input = -r_input
+                yaw_input = -yaw_input
             if invert_right_y:
                 p_input = -p_input
                 

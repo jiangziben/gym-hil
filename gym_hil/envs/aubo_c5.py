@@ -13,7 +13,7 @@ class AuboC5(BaseAgent):
     keyframes = dict(
         reset=Keyframe(
             qpos=np.array(
-                [0, 0.1, 0.0, 0, 0.1, 0]
+                [1.5623385,  0.7971761,  1.6842455,  0.8892992,  0.01736733, 0.01151336]
             ),
             pose=sapien.Pose(),
         )
@@ -43,7 +43,7 @@ class AuboC5(BaseAgent):
             stiffness=self.arm_stiffness,
             damping=self.arm_damping,
             force_limit=self.arm_force_limit,
-            use_delta=True
+            use_delta=False
         )
 
 

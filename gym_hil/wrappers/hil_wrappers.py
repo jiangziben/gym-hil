@@ -63,7 +63,7 @@ class EEActionWrapper(gym.ActionWrapper):
                 ee_action_step_size["z"],
             ]
         )
-        num_actions = 3
+        num_actions = 6
 
         # Initialize action space bounds for the non-gripper case
         action_space_bounds_min = -np.ones(num_actions)
