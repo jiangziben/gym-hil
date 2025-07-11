@@ -79,7 +79,10 @@ class InputController:
     def get_deltas(self):
         """Get the current movement deltas (dx, dy, dz) in meters."""
         return 0.0, 0.0, 0.0
-
+    def get_deltas_rpy(self):
+        """Get the current movement deltas (dr, dp, dyaw) in radians."""
+        return 0.0, 0.0, 0.0
+    
     def update(self):
         """Update controller state - call this once per frame."""
         pass
@@ -252,7 +255,7 @@ class GamepadController(InputController):
         self.joystick = None
         self.intervention_flag = False
         self.config_path = config_path
-        self.controller_config = None
+        self.controller_config = {}
 
     def start(self):
         """Initialize pygame and the gamepad."""
@@ -351,17 +354,20 @@ class GamepadController(InputController):
             # Get axis indices from config (with defaults if not found)
             left_x_axis = axes.get("left_x", 0)
             left_y_axis = axes.get("left_y", 1)
-            right_y_axis = axes.get("right_y", 3)
+            up_axis = axes.get("up", 2)  # For right stick vertical movement
+            down_axis = axes.get("down", 5)  # For right stick vertical movement
+            
 
             # Get axis inversion settings (with defaults if not found)
             invert_left_x = axis_inversion.get("left_x", False)
             invert_left_y = axis_inversion.get("left_y", True)
-            invert_right_y = axis_inversion.get("right_y", True)
 
             # Read joystick axes
             x_input = self.joystick.get_axis(left_x_axis)  # Left/Right
             y_input = self.joystick.get_axis(left_y_axis)  # Up/Down
-            z_input = self.joystick.get_axis(right_y_axis)  # Up/Down for Z
+            z_input = self.joystick.get_axis(up_axis) - self.joystick.get_axis(down_axis)  # Up/Down for Z
+
+            # Apply deadzone to avoid drift
 
             # Apply deadzone to avoid drift
             x_input = 0 if abs(x_input) < self.deadzone else x_input
@@ -372,9 +378,7 @@ class GamepadController(InputController):
             if invert_left_x:
                 x_input = -x_input
             if invert_left_y:
-                y_input = -y_input
-            if invert_right_y:
-                z_input = -z_input
+                y_input = -y_input                
 
             # Calculate deltas
             delta_x = y_input * self.y_step_size  # Forward/backward
@@ -382,6 +386,57 @@ class GamepadController(InputController):
             delta_z = z_input * self.z_step_size  # Up/down
 
             return delta_x, delta_y, delta_z
+
+        except pygame.error:
+            print("Error reading gamepad. Is it still connected?")
+            return 0.0, 0.0, 0.0
+
+    def get_deltas_rpy(self):
+        """Get the current movement deltas from gamepad state."""
+        import pygame
+
+        try:
+            # Get axis mappings from config
+            axes = self.controller_config.get("axes", {})
+            buttons = self.controller_config.get("buttons", {})
+            axis_inversion = self.controller_config.get("axis_inversion", {})
+
+            # Get axis indices from config (with defaults if not found)
+            right_x_axis = axes.get("right_x", 3)
+            right_y_axis = axes.get("right_y", 4)
+            roll_button = buttons.get("roll", 6)  # Default to 6 if not found
+            roll_negative_button = buttons.get("roll_negative", 7)  # Default to 7 if not found
+            
+
+            # Get axis inversion settings (with defaults if not found)
+            invert_right_x = axis_inversion.get("right_x", True)
+            invert_right_y = axis_inversion.get("right_y", True)
+
+            # Read joystick axes
+            yaw_input = self.joystick.get_axis(right_x_axis)  # r
+            p_input = self.joystick.get_axis(right_y_axis)  # p
+            r_input = self.joystick.get_button(roll_button) - self.joystick.get_button(roll_negative_button)  # yaw
+
+            # Apply deadzone to avoid drift
+
+            # Apply deadzone to avoid drift
+            r_input = 0 if abs(r_input) < self.deadzone else r_input
+            p_input = 0 if abs(p_input) < self.deadzone else p_input
+            yaw_input = 0 if abs(yaw_input) < self.deadzone else yaw_input
+
+            # Apply inversion if configured
+            if invert_right_x:
+                yaw_input = -yaw_input
+            if invert_right_y:
+                p_input = -p_input
+                
+
+            # Calculate deltas
+            delta_r = r_input * 0.1  # Roll
+            delta_p = p_input * 0.1  # Pitch
+            delta_yaw = yaw_input * 0.1  # Yaw
+
+            return delta_r, delta_p, delta_yaw
 
         except pygame.error:
             print("Error reading gamepad. Is it still connected?")

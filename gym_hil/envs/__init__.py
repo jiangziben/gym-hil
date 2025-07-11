@@ -16,5 +16,6 @@
 
 from gym_hil.envs.panda_arrange_boxes_gym_env import PandaArrangeBoxesGymEnv
 from gym_hil.envs.panda_pick_gym_env import PandaPickCubeGymEnv
+from gym_hil.envs.charging_task_gym_env import ChargingTaskEnv
 
-__all__ = ["PandaPickCubeGymEnv", "PandaArrangeBoxesGymEnv"]
+__all__ = ["PandaPickCubeGymEnv", "PandaArrangeBoxesGymEnv","ChargingTaskEnv"]

@@ -28,7 +28,10 @@
       "left_x": 0,
       "left_y": 1,
       "right_x": 3,
-      "right_y": 4
+      "right_y": 4,
+      "left_right": 6,
+      "up":2,
+      "down":5
     },
     "buttons": {
       "a": 0,
@@ -37,6 +40,8 @@
       "y": 3,
       "lb": 4,
       "rb": 5,
+      "roll":6,
+      "roll_negative":7,
       "lt": 9,
       "rt": 10
     },
@@ -44,7 +49,7 @@
       "left_x": true,
       "left_y": true,
       "right_x": true,
-      "right_y": true
+      "right_y": false
     }
   },
   "PS4 Controller": {
