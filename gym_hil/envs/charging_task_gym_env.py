@@ -26,7 +26,11 @@ class ChargingTaskEnv(BaseEnv):
                 "front": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
                 "wrist": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
             }),
-            "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0]]).shape, dtype=np.float32)
+            "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
+                                                                                    obs["agent"]["qvel"].cpu().numpy()[0],
+                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0],
+                                                                                    self.tcp.get_net_contact_forces().cpu().numpy()[0]
+                                                                                    ]).shape, dtype=np.float32)
         })
         
         
@@ -63,7 +67,7 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0]])
+        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0],self.tcp.get_net_contact_forces().cpu().numpy()[0]])
         
         return new_obs,info
     def clip_action(self, action):
@@ -83,7 +87,7 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0]])
+        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0],self.tcp.get_net_contact_forces().cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
         self.render()
         # # # 增加姿态惩罚

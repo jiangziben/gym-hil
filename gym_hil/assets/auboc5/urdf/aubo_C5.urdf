@@ -243,7 +243,7 @@
   </link>
 
   <joint name="charging_gun_joint" type="fixed">
-    <origin xyz="0.0 0.0 0.13" rpy="-1.57 -1.57 0" />
+    <origin xyz="0.0 0.0 0.131" rpy="-1.57 -1.57 0" />
     <parent link="wrist3_Link" />
     <child link="charging_gun_Link" />
   </joint>
