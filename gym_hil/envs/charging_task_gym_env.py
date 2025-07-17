@@ -18,7 +18,7 @@ class ChargingTaskEnv(BaseEnv):
 
     agent: Union[AuboC5]
     def __init__(self, *args,robot_uids="aubo_c5",image_obs = True, **kwargs):
-        super().__init__(*args,robot_uids=robot_uids, **kwargs)
+        super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
         info = self.get_info()
         obs = self.get_obs(info)
         self.observation_space = spaces.Dict({
@@ -26,10 +26,14 @@ class ChargingTaskEnv(BaseEnv):
                 "front": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
                 "wrist": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
             }),
+            # "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
+            #                                                                         obs["agent"]["qvel"].cpu().numpy()[0],
+            #                                                                         self.tcp.pose.raw_pose.cpu().numpy()[0],
+            #                                                                         self.tcp.get_net_contact_forces().cpu().numpy()[0]
+            #                                                                         ]).shape, dtype=np.float32)
             "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
                                                                                     obs["agent"]["qvel"].cpu().numpy()[0],
-                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0],
-                                                                                    self.tcp.get_net_contact_forces().cpu().numpy()[0]
+                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0]
                                                                                     ]).shape, dtype=np.float32)
         })
         
@@ -41,17 +45,20 @@ class ChargingTaskEnv(BaseEnv):
         self.tcp = self.agent.robot.find_link_by_name('charging_gun_Link')
         
     def _load_scene(self, options: dict):
-        # charging_socket_pose = rand_pose(
-        #     xlim=[-0.5,0.5],
-        #     ylim=[-0.5,-0.7],
-        #     zlim=[0.3,0.9],
-        #     qpos=[ 0, 0.707107, 0,0.707107],
-        #     ylim_prop=False,
-        #     rotate_rand=False,
-        #     rotate_lim=[0,0,0],
-        # )
-        charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
-        charging_socket_pose.set_rpy([0,-np.pi/2,-np.pi/2])
+        tmp = sapien.Pose(p=[0,0,0])
+        tmp.set_rpy([0, -np.pi / 2, -np.pi / 2])
+        charging_socket_quat = tmp.get_q()
+        charging_socket_pose = rand_pose(
+            xlim=[0.5,0.7],
+            ylim=[-0.1,0.1],
+            zlim=[0.6,0.8],
+            qpos=charging_socket_quat,
+            ylim_prop=False,
+            rotate_rand=False,
+            rotate_lim=[0,0,0],
+        )
+        # charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
+        # charging_socket_pose.set_rpy([0,-np.pi/2,-np.pi/2])
 
         self.charging_socket,_ = create_glb(
             self.scene,
@@ -67,18 +74,25 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0],self.tcp.get_net_contact_forces().cpu().numpy()[0]])
+        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0],
+        #                                        self.tcp.get_net_contact_forces().cpu().numpy()[0]
+        #                                        ])
+        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+                                               self.tcp.pose.raw_pose.cpu().numpy()[0]
+                                               ])
         
         return new_obs,info
     def clip_action(self, action):
-        return np.clip(action, [0.1,-1.0, 0.1], [1.0,1.0,1.0])
+        return np.clip(action, [0.1,-0.9, 0.1], [0.9,0.9,0.9])
     
     def step(self, action):
         # print("action: ",action)
         action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止手腕转动
         new_action = action
         self.control_input_sum += new_action[:3]
-        new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3] + self.control_input_sum)
+        # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
+        new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3].cpu().numpy() + self.control_input_sum)
         self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
         # print("new_action: ",new_action)
         # print("self.control_input_sum: ",self.control_input_sum)
@@ -87,8 +101,13 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],self.tcp.pose.raw_pose.cpu().numpy()[0],self.tcp.get_net_contact_forces().cpu().numpy()[0]])
+        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0],
+        #                                        self.tcp.get_net_contact_forces().cpu().numpy()[0]])
+        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+                                               self.tcp.pose.raw_pose.cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
+        
         self.render()
         # # # 增加姿态惩罚
         # λ_orient = 0.1
@@ -134,6 +153,7 @@ class ChargingTaskEnv(BaseEnv):
                 init_pose
             )
             self.tcp_init_pose = self.tcp.pose.raw_pose
+                        
     def _get_obs_extra(self, info: Dict):
         # some useful observation info for solving the task includes the pose of the tcp (tool center point) which is the point between the
         # grippers of the robot
