@@ -11,6 +11,7 @@ from mani_skill.sensors.camera import CameraConfig
 from gymnasium import spaces
 from scipy.spatial.transform import Rotation as R
 import numpy as np
+from .admittance_controller import AdmittanceController
 
 @register_env("ChargingTask-v0", max_episode_steps=1000)
 class ChargingTaskEnv(BaseEnv):
@@ -18,6 +19,14 @@ class ChargingTaskEnv(BaseEnv):
 
     agent: Union[AuboC5]
     def __init__(self, *args,robot_uids="aubo_c5",image_obs = True, **kwargs):
+        # 控制周期
+        dt = 0.1
+        # 控制参数
+        M_diag = [20, 20, 20, 0.1, 0.1, 0.1]
+        D_diag = [200, 200, 200, 2, 2, 2]
+        K_diag = [100, 100, 100, 5, 5, 5]
+        # 初始化阻抗控制器
+        self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
         super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
         info = self.get_info()
         obs = self.get_obs(info)
@@ -36,7 +45,7 @@ class ChargingTaskEnv(BaseEnv):
                                                                                     self.tcp.pose.raw_pose.cpu().numpy()[0]
                                                                                     ]).shape, dtype=np.float32)
         })
-        
+
         
     def _load_agent(self, options: dict):
         super()._load_agent(options, sapien.Pose(p=[0, 0, 0]))
@@ -82,21 +91,51 @@ class ChargingTaskEnv(BaseEnv):
                                                self.tcp.pose.raw_pose.cpu().numpy()[0]
                                                ])
         
+        self.admittance_controller.reset(self.tcp_init_pose.cpu().numpy()[0])
+        
         return new_obs,info
+    
     def clip_action(self, action):
         return np.clip(action, [0.1,-0.9, 0.1], [0.9,0.9,0.9])
+    
+    def compute_force_and_torque(self, scene, ee_link):
+        dt = scene.get_timestep()
+        total_force = np.zeros(6, dtype=np.float32)
+        ee_pos = np.array(ee_link.pose.p)
+
+        contacts = scene.get_contacts()
+        for contact in contacts:
+            if ee_link._objs[0] in contact.bodies:
+                for point in contact.points:
+                    impulse = np.array(point.impulse)
+                    force = impulse / dt
+                    total_force[:3] += force
+
+                    r = np.array(point.position) - ee_pos
+                    torque = np.cross(r[0], force)
+                    total_force[3:] += torque
+
+        return total_force  
     
     def step(self, action):
         # print("action: ",action)
         action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止手腕转动
         new_action = action
         self.control_input_sum += new_action[:3]
-        # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
+        # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
         new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3].cpu().numpy() + self.control_input_sum)
         self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
         # print("new_action: ",new_action)
         # print("self.control_input_sum: ",self.control_input_sum)
+        new_action = self.admittance_controller.step(new_action[:3],np.array([0,0,0,1]),self.tcp_force[0:3],self.tcp_force[3:6])
         obs, reward, done,truncated, info = super().step(new_action[:6])
+        # import time
+        # start = time.time()
+        self.tcp_force = self.compute_force_and_torque(self.scene, self.tcp)
+        # used_time = time.time() - start
+        # print("used time: ",used_time)
+        # print(force)
+
         new_obs = {}
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
@@ -153,7 +192,9 @@ class ChargingTaskEnv(BaseEnv):
                 init_pose
             )
             self.tcp_init_pose = self.tcp.pose.raw_pose
-                        
+            self.tcp_force = self.compute_force_and_torque(self.scene, self.tcp)
+
+            
     def _get_obs_extra(self, info: Dict):
         # some useful observation info for solving the task includes the pose of the tcp (tool center point) which is the point between the
         # grippers of the robot
