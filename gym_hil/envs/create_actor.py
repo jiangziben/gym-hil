@@ -4,6 +4,7 @@ import transforms3d as t3d
 import sapien.physx as sapienp
 import json
 import os
+from sapien.physx import PhysxMaterial
 file_path = os.path.dirname(os.path.abspath(__file__))
 # create box
 def create_box(
@@ -237,6 +238,12 @@ def create_glb(
         model_data = None
     
     builder = scene.create_actor_builder()
+    material = PhysxMaterial(
+        static_friction=0.8,
+        dynamic_friction=0.6,
+        restitution=0.2
+    )
+
     if is_static:
         builder.set_physx_body_type("static")
     else:
@@ -254,6 +261,7 @@ def create_glb(
         builder.add_nonconvex_collision_from_file(
             filename = file_name,
             scale = scale,
+            material=material
         )
     
     builder.add_visual_from_file(

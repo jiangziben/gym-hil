@@ -20,11 +20,11 @@ class ChargingTaskEnv(BaseEnv):
     agent: Union[AuboC5]
     def __init__(self, *args,robot_uids="aubo_c5",image_obs = True, **kwargs):
         # 控制周期
-        dt = 0.1
+        dt = 0.01
         # 控制参数
-        M_diag = [20, 20, 20, 0.1, 0.1, 0.1]
-        D_diag = [200, 200, 200, 2, 2, 2]
-        K_diag = [100, 100, 100, 5, 5, 5]
+        M_diag = [1, 1, 1, 1, 1, 1]
+        D_diag = [150, 80, 80, 20, 20, 20]
+        K_diag = [30, 0, 0, 5, 5, 5]
         # 初始化阻抗控制器
         self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
         super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
@@ -35,15 +35,15 @@ class ChargingTaskEnv(BaseEnv):
                 "front": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
                 "wrist": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
             }),
-            # "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
-            #                                                                         obs["agent"]["qvel"].cpu().numpy()[0],
-            #                                                                         self.tcp.pose.raw_pose.cpu().numpy()[0],
-            #                                                                         self.tcp.get_net_contact_forces().cpu().numpy()[0]
-            #                                                                         ]).shape, dtype=np.float32)
             "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
                                                                                     obs["agent"]["qvel"].cpu().numpy()[0],
-                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0]
+                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0],
+                                                                                    self.tcp.get_net_contact_forces().cpu().numpy()[0]
                                                                                     ]).shape, dtype=np.float32)
+            # "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
+            #                                                                         obs["agent"]["qvel"].cpu().numpy()[0],
+            #                                                                         self.tcp.pose.raw_pose.cpu().numpy()[0]
+            #                                                                         ]).shape, dtype=np.float32)
         })
 
         
@@ -76,6 +76,7 @@ class ChargingTaskEnv(BaseEnv):
             convex=False,
             is_static=True
         )
+        
     def reset(self,**kwargs):
         self.control_input_sum = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         obs,info = super().reset(**kwargs)
@@ -83,13 +84,13 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0],
-        #                                        self.tcp.get_net_contact_forces().cpu().numpy()[0]
-        #                                        ])
         new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-                                               self.tcp.pose.raw_pose.cpu().numpy()[0]
+                                               self.tcp.pose.raw_pose.cpu().numpy()[0],
+                                               self.tcp.get_net_contact_forces().cpu().numpy()[0]
                                                ])
+        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]
+        #                                        ])
         
         self.admittance_controller.reset(self.tcp_init_pose.cpu().numpy()[0])
         
@@ -119,15 +120,20 @@ class ChargingTaskEnv(BaseEnv):
     
     def step(self, action):
         # print("action: ",action)
-        action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止手腕转动
-        new_action = action
-        self.control_input_sum += new_action[:3]
-        # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
-        new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3].cpu().numpy() + self.control_input_sum)
-        self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
+        action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
+        action *= 1000.0 # 放大动作范围
+        # new_action = action
+        # self.control_input_sum += new_action[:3]
+        # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
+        # new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3].cpu().numpy() + self.control_input_sum)
+        # self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
         # print("new_action: ",new_action)
         # print("self.control_input_sum: ",self.control_input_sum)
-        new_action = self.admittance_controller.step(new_action[:3],np.array([0,0,0,1]),self.tcp_force[0:3],self.tcp_force[3:6])
+        x_desired = self.tcp.pose.get_p().cpu().numpy()[0] #期望位置，以tcp当前姿态为期望位置
+        q_desired = np.array([0,0,0,1],dtype=np.float32) #期望姿态
+        input_force = action[0:3] + self.tcp_force[0:3] #输入力
+        input_torque = action[3:6] + self.tcp_force[3:6] #输入力矩
+        new_action = self.admittance_controller.step(x_desired,q_desired,input_force,input_torque)
         obs, reward, done,truncated, info = super().step(new_action[:6])
         # import time
         # start = time.time()
@@ -140,11 +146,11 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0],
-        #                                        self.tcp.get_net_contact_forces().cpu().numpy()[0]])
         new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-                                               self.tcp.pose.raw_pose.cpu().numpy()[0]])
+                                               self.tcp.pose.raw_pose.cpu().numpy()[0],
+                                               self.tcp.get_net_contact_forces().cpu().numpy()[0]])
+        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
         
         self.render()
@@ -162,8 +168,11 @@ class ChargingTaskEnv(BaseEnv):
         charging_socket_pos[:,0] += 0.034
         eps = torch.tensor([0.001,0.01,0.01])
         # print("abs(charging_gun_pos - charging_socket_pos): ",abs(charging_gun_pos - charging_socket_pos))
+        contact_forces = self.tcp.get_net_contact_forces()
+        contact_forces_flag = (contact_forces[:,0] < -1.0) #力约束
+        pos_flag = torch.all(abs(charging_gun_pos - charging_socket_pos) < eps,axis=1) #位置约束
         return {
-            "success": torch.all(abs(charging_gun_pos - charging_socket_pos) < eps,axis=1),
+            "success": contact_forces_flag & pos_flag,
         }
     @property
     def _default_sensor_configs(self):

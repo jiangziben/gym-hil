@@ -45,14 +45,14 @@ class AdmittanceController:
         self.x += self.dx * self.dt
 
         # # --- 姿态导纳控制 ---
-        # q_des_r = R.from_quat(q_des)
-        # q_err = (q_des_r * self.q.inv()).as_rotvec()  # 姿态误差用旋转向量表示
+        q_des_r = R.from_quat(q_des)
+        q_err = (q_des_r * self.q.inv()).as_rotvec()  # 姿态误差用旋转向量表示
 
-        # torque_feedback = torque - self.D_ori @ self.w - self.K_ori @ q_err
-        # dw = np.linalg.inv(self.M_ori) @ torque_feedback
-        # self.w += dw * self.dt
-        # delta_q = R.from_rotvec(self.w * self.dt)
-        # self.q = delta_q * self.q  # 更新四元数
+        torque_feedback = torque - self.D_ori @ self.w - self.K_ori @ q_err
+        dw = np.linalg.inv(self.M_ori) @ torque_feedback
+        self.w += dw * self.dt
+        delta_q = R.from_rotvec(self.w * self.dt)
+        self.q = delta_q * self.q  # 更新四元数
         rpy = self.q.as_euler('xyz', degrees=False)  # 计算rpy角（弧度）
 
         return np.concatenate([self.x, rpy])
