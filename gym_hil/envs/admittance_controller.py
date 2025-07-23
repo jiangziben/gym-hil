@@ -27,6 +27,12 @@ class AdmittanceController:
         self.dx = np.zeros(3)
         self.q = R.from_quat([pose[4], pose[5], pose[6], pose[3]])  # 四元数格式为 [x, y, z, w]
         self.w = np.zeros(3)
+        
+    def set_state(self, x: np.ndarray, dx: np.ndarray, q: np.ndarray, w: np.ndarray):
+        self.x = x.copy()
+        self.dx = dx.copy()
+        self.q = R.from_quat([q[1],q[2],q[3],q[0]])  # 四元数格式为 [x, y, z, w]
+        self.w = w.copy()
 
     def step(self, x_des: np.ndarray, q_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
         """

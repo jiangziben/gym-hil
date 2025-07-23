@@ -12,6 +12,8 @@ from gymnasium import spaces
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 from .admittance_controller import AdmittanceController
+from .force_vis import RealTimeForceVisualizer
+from .image_vis import RealTimeImagePlotter
 
 @register_env("ChargingTask-v0", max_episode_steps=1000)
 class ChargingTaskEnv(BaseEnv):
@@ -23,7 +25,7 @@ class ChargingTaskEnv(BaseEnv):
         dt = 0.01
         # 控制参数
         M_diag = [1, 1, 1, 1, 1, 1]
-        D_diag = [150, 80, 80, 20, 20, 20]
+        D_diag = [600, 300, 300, 20, 20, 20]
         K_diag = [30, 0, 0, 5, 5, 5]
         # 初始化阻抗控制器
         self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
@@ -38,14 +40,16 @@ class ChargingTaskEnv(BaseEnv):
             "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
                                                                                     obs["agent"]["qvel"].cpu().numpy()[0],
                                                                                     self.tcp.pose.raw_pose.cpu().numpy()[0],
-                                                                                    self.tcp.get_net_contact_forces().cpu().numpy()[0]
+                                                                                    self.tcp_force
                                                                                     ]).shape, dtype=np.float32)
             # "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
             #                                                                         obs["agent"]["qvel"].cpu().numpy()[0],
             #                                                                         self.tcp.pose.raw_pose.cpu().numpy()[0]
             #                                                                         ]).shape, dtype=np.float32)
         })
-
+        self.control_force_vis = RealTimeForceVisualizer("control_force")
+        self.state_force_vis = RealTimeForceVisualizer("state_force")
+        self.image_vis = RealTimeImagePlotter("front", "wrist")
         
     def _load_agent(self, options: dict):
         super()._load_agent(options, sapien.Pose(p=[0, 0, 0]))
@@ -86,7 +90,7 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
         new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
                                                self.tcp.pose.raw_pose.cpu().numpy()[0],
-                                               self.tcp.get_net_contact_forces().cpu().numpy()[0]
+                                               self.tcp_force
                                                ])
         # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
         #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]
@@ -121,7 +125,7 @@ class ChargingTaskEnv(BaseEnv):
     def step(self, action):
         # print("action: ",action)
         action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
-        action *= 1000.0 # 放大动作范围
+        action *= 10000.0 # 放大动作范围
         # new_action = action
         # self.control_input_sum += new_action[:3]
         # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
@@ -133,6 +137,10 @@ class ChargingTaskEnv(BaseEnv):
         q_desired = np.array([0,0,0,1],dtype=np.float32) #期望姿态
         input_force = action[0:3] + self.tcp_force[0:3] #输入力
         input_torque = action[3:6] + self.tcp_force[3:6] #输入力矩
+        self.admittance_controller.set_state(self.tcp.pose.get_p().cpu().numpy()[0],
+                                             self.tcp.linear_velocity.cpu().numpy()[0],
+                                             self.tcp.pose.get_q().cpu().numpy()[0],
+                                             self.tcp.angular_velocity.cpu().numpy()[0])
         new_action = self.admittance_controller.step(x_desired,q_desired,input_force,input_torque)
         obs, reward, done,truncated, info = super().step(new_action[:6])
         # import time
@@ -148,11 +156,15 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
         new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
                                                self.tcp.pose.raw_pose.cpu().numpy()[0],
-                                               self.tcp.get_net_contact_forces().cpu().numpy()[0]])
+                                               self.tcp_force])
         # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
         #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
-        
+        # show
+        self.control_force_vis.update_force(action[:3]) # 更新力可视化
+        self.state_force_vis.update_force(self.tcp_force[0:3]) # 更新力可视化
+        self.image_vis.update(new_obs["pixels"]["front"],
+                             new_obs["pixels"]["wrist"])
         self.render()
         # # # 增加姿态惩罚
         # λ_orient = 0.1
