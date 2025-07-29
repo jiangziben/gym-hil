@@ -17,7 +17,7 @@
       "rt": 7
     },
     "axis_inversion": {
-      "left_x": false,
+      "left_x": true,
       "left_y": true,
       "right_x": false,
       "right_y": true

@@ -46,7 +46,8 @@ def load_controller_config(controller_name: str, config_path: str | None = None)
 class InputController:
     """Base class for input controllers that generate motion deltas."""
 
-    def __init__(self, x_step_size=0.01, y_step_size=0.01, z_step_size=0.01):
+    def __init__(self, x_step_size=0.01, y_step_size=0.01, z_step_size=0.01,
+                 roll_step_size=0.01, pitch_step_size=0.01, yaw_step_size=0.01):
         """
         Initialize the controller.
 
@@ -58,6 +59,9 @@ class InputController:
         self.x_step_size = x_step_size
         self.y_step_size = y_step_size
         self.z_step_size = z_step_size
+        self.roll_step_size = roll_step_size
+        self.pitch_step_size = pitch_step_size
+        self.yaw_step_size = yaw_step_size
         self.running = True
         self.episode_end_status = None  # None, "success", or "failure"
         self.intervention_flag = False
@@ -249,8 +253,10 @@ class KeyboardController(InputController):
 class GamepadController(InputController):
     """Generate motion deltas from gamepad input."""
 
-    def __init__(self, x_step_size=0.01, y_step_size=0.01, z_step_size=0.01, deadzone=0.01, config_path=None):
-        super().__init__(x_step_size, y_step_size, z_step_size)
+    def __init__(self, x_step_size=0.01, y_step_size=0.01, z_step_size=0.01,
+                 roll_step_size=0.01, pitch_step_size=0.01, yaw_step_size=0.01,
+                 deadzone=0.01, config_path=None):
+        super().__init__(x_step_size, y_step_size, z_step_size, roll_step_size, pitch_step_size, yaw_step_size)
         self.deadzone = deadzone
         self.joystick = None
         self.intervention_flag = False
@@ -432,9 +438,9 @@ class GamepadController(InputController):
                 
 
             # Calculate deltas
-            delta_r = r_input * 0.1  # Roll
-            delta_p = p_input * 0.1  # Pitch
-            delta_yaw = yaw_input * 0.1  # Yaw
+            delta_r = r_input * self.roll_step_size   # Roll
+            delta_p = p_input * self.pitch_step_size # Pitch
+            delta_yaw = yaw_input * self.yaw_step_size # Yaw
 
             return delta_r, delta_p, delta_yaw
 

@@ -127,6 +127,6 @@ register(
         "obs_mode" : "rgb",
         "reward_mode": "sparse",
         "image_obs": True,
-        "render_mode": "rgb_array"
+        "render_mode": "human"
     },
 )

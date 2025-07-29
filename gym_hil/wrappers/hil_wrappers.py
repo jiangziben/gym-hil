@@ -23,8 +23,8 @@ import numpy as np
 
 from gym_hil.mujoco_gym_env import MAX_GRIPPER_COMMAND
 
-DEFAULT_EE_STEP_SIZE = {"x": 0.025, "y": 0.025, "z": 0.025}
-
+# DEFAULT_EE_STEP_SIZE = {"x": 0.025, "y": 0.025, "z": 0.025}
+DEFAULT_EE_STEP_SIZE = {"x": 100.0, "y": 100.0, "z": 100.0, "rx": 10, "ry": 10, "rz": 10}
 
 class GripperPenaltyWrapper(gym.Wrapper):
     def __init__(self, env, penalty=-0.05):
@@ -61,6 +61,9 @@ class EEActionWrapper(gym.ActionWrapper):
                 ee_action_step_size["x"],
                 ee_action_step_size["y"],
                 ee_action_step_size["z"],
+                ee_action_step_size["rx"],
+                ee_action_step_size["ry"],
+                ee_action_step_size["rz"],
             ]
         )
         num_actions = 6
@@ -90,9 +93,9 @@ class EEActionWrapper(gym.ActionWrapper):
         """
 
         # action between -1 and 1, scale to step_size
-        action_xyz = action[:3] * self._ee_step_size
+        action_xyz = action[:3] * self._ee_step_size[:3]
         # TODO: Extend to enable orientation control
-        actions_orn = action[3:6]#np.zeros(3)
+        actions_orn = action[3:6] * self._ee_step_size[3:6]#np.zeros(3)
 
         gripper_open_command = [0.0]
         if self.use_gripper:
@@ -116,6 +119,9 @@ class InputsControlWrapper(gym.Wrapper):
         x_step_size=1.0,
         y_step_size=1.0,
         z_step_size=0.5,
+        roll_step_size=1.0,
+        pitch_step_size=1.0,
+        yaw_step_size=1.0,
         use_gripper=False,
         auto_reset=False,
         input_threshold=0.001,
@@ -156,6 +162,9 @@ class InputsControlWrapper(gym.Wrapper):
                     x_step_size=x_step_size,
                     y_step_size=y_step_size,
                     z_step_size=z_step_size,
+                    roll_step_size=roll_step_size,
+                    pitch_step_size=pitch_step_size,
+                    yaw_step_size=yaw_step_size,
                     config_path=controller_config_path,
                 )
         else:

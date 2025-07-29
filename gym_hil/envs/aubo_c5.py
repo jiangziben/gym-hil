@@ -36,14 +36,15 @@ class AuboC5(BaseAgent):
         arm_pdee_delta_pos = PDEEPoseControllerConfig(
             self.arm_joint_names,
             ee_link = "charging_gun_Link",
-            pos_lower=[-1.0] * 3,
-            pos_upper=[1.0] * 3,
+            pos_lower=[-1.0],
+            pos_upper=[1.0],
             rot_lower=-1.0,
             rot_upper=1.0,
             stiffness=self.arm_stiffness,
             damping=self.arm_damping,
             force_limit=self.arm_force_limit,
-            use_delta=False
+            use_delta=True,
+            frame="body_translation:body_aligned_body_rotation"
         )
 
 

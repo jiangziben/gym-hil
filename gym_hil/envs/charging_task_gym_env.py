@@ -14,6 +14,8 @@ import numpy as np
 from .admittance_controller import AdmittanceController
 from .force_vis import RealTimeForceVisualizer
 from .image_vis import RealTimeImagePlotter
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 @register_env("ChargingTask-v0", max_episode_steps=1000)
 class ChargingTaskEnv(BaseEnv):
@@ -24,9 +26,9 @@ class ChargingTaskEnv(BaseEnv):
         # 控制周期
         dt = 0.01
         # 控制参数
-        M_diag = [1, 1, 1, 1, 1, 1]
-        D_diag = [600, 300, 300, 20, 20, 20]
-        K_diag = [30, 0, 0, 5, 5, 5]
+        M_diag = [1, 1, 1, 0.05, 0.05, 0.05]
+        D_diag = [100, 50, 50, 5, 5, 5]
+        K_diag = [0, 0, 0, 0, 0, 0]
         # 初始化阻抗控制器
         self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
         super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
@@ -49,7 +51,7 @@ class ChargingTaskEnv(BaseEnv):
         })
         self.control_force_vis = RealTimeForceVisualizer("control_force")
         self.state_force_vis = RealTimeForceVisualizer("state_force")
-        self.image_vis = RealTimeImagePlotter("front", "wrist")
+        # self.image_vis = RealTimeImagePlotter("front", "wrist")
         
     def _load_agent(self, options: dict):
         super()._load_agent(options, sapien.Pose(p=[0, 0, 0]))
@@ -121,11 +123,69 @@ class ChargingTaskEnv(BaseEnv):
                     total_force[3:] += torque
 
         return total_force  
+    def orientation_penalty(self,q_current, q_ref, threshold_rad=np.pi/6, penalty_scale=1.0):
+        """
+        计算当前姿态和参考姿态之间的旋转角度差异惩罚，
+        当旋转差超过阈值时，产生平方惩罚。
+
+        返回:
+            penalty: (N,) 张量，batch中每个样本的惩罚值
+        """
+        # 保证输入是2维batch
+        if q_current.ndim == 1:
+            q_current = q_current.unsqueeze(0)
+        if q_ref.ndim == 1:
+            q_ref = q_ref.unsqueeze(0)
+
+        # 归一化四元数
+        q_current = q_current / q_current.norm(dim=1, keepdim=True).clamp(min=1e-8)
+        q_ref = q_ref / q_ref.norm(dim=1, keepdim=True).clamp(min=1e-8)
+
+        # 计算两个四元数的点积 |<q1, q2>|
+        dot = torch.abs(torch.sum(q_current * q_ref, dim=1)).clamp(max=1.0)
+
+        # 计算夹角θ = 2 * acos(|dot|)
+        angle = 2.0 * torch.acos(dot)
+
+        # 计算超过阈值的部分
+        excess = torch.relu(angle - threshold_rad)
+
+        # 惩罚：超出部分的平方，并乘以惩罚系数
+        penalty = penalty_scale * excess * excess
+        return penalty
+    
+    def orientation_penalty_x(self,q_current, penalty_scale=0.1):
+        """
+        对当前姿态绕x轴（roll）的角度进行平方惩罚，目标是越接近0越好（不使用阈值）。
+
+        Args:
+            q_current: (N, 4) 当前四元数，格式 (w, x, y, z)
+            penalty_scale: 惩罚系数
+
+        Returns:
+            penalty: (N,) 张量，每个样本的姿态惩罚
+        """
+
+        def quat_to_roll(q):
+            # q: (N, 4)
+            w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+            sinr_cosp = 2 * (w * x + y * z)
+            cosr_cosp = 1 - 2 * (x * x + y * y)
+            roll = torch.atan2(sinr_cosp, cosr_cosp)
+            return roll
+
+        if q_current.ndim == 1:
+            q_current = q_current.unsqueeze(0)
+
+        q_current = F.normalize(q_current, dim=1)
+        roll = quat_to_roll(q_current)
+
+        penalty = penalty_scale * roll ** 2
+        return penalty
     
     def step(self, action):
         # print("action: ",action)
-        action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
-        action *= 10000.0 # 放大动作范围
+        # action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
         # new_action = action
         # self.control_input_sum += new_action[:3]
         # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
@@ -148,7 +208,7 @@ class ChargingTaskEnv(BaseEnv):
         self.tcp_force = self.compute_force_and_torque(self.scene, self.tcp)
         # used_time = time.time() - start
         # print("used time: ",used_time)
-        # print(force)
+        # print(self.tcp_force)
 
         new_obs = {}
         new_obs["pixels"] = {}
@@ -161,14 +221,16 @@ class ChargingTaskEnv(BaseEnv):
         #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
         # show
-        self.control_force_vis.update_force(action[:3]) # 更新力可视化
-        self.state_force_vis.update_force(self.tcp_force[0:3]) # 更新力可视化
-        self.image_vis.update(new_obs["pixels"]["front"],
-                             new_obs["pixels"]["wrist"])
+        self.control_force_vis.update_force(action) # 更新力可视化
+        self.state_force_vis.update_force(self.tcp_force) # 更新力可视化
+        self.control_force_vis.show() # 显示力可视化
+        self.state_force_vis.show() # 显示力可视化
+        # self.image_vis.update(new_obs["pixels"]["front"],
+        #                      new_obs["pixels"]["wrist"])
         self.render()
         # # # 增加姿态惩罚
-        # λ_orient = 0.1
-        # reward = reward.float() - λ_orient * self.orientation_penalty(self.tcp.pose.q, [1, 0, 0, 0])
+        λ_orient = 0.1
+        reward = reward.float() - self.orientation_penalty_x(self.tcp.pose.q ,penalty_scale=λ_orient)
             
         # print("reward: ",reward.float())
         # print("agent_pos: ",obs["agent"]["qpos"].cpu().numpy()[0])
