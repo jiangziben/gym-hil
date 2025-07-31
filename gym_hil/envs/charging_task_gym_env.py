@@ -49,8 +49,8 @@ class ChargingTaskEnv(BaseEnv):
             #                                                                         self.tcp.pose.raw_pose.cpu().numpy()[0]
             #                                                                         ]).shape, dtype=np.float32)
         })
-        self.control_force_vis = RealTimeForceVisualizer("control_force")
-        self.state_force_vis = RealTimeForceVisualizer("state_force")
+        # self.control_force_vis = RealTimeForceVisualizer("control_force")
+        # self.state_force_vis = RealTimeForceVisualizer("state_force")
         # self.image_vis = RealTimeImagePlotter("front", "wrist")
         
     def _load_agent(self, options: dict):
@@ -154,7 +154,7 @@ class ChargingTaskEnv(BaseEnv):
         penalty = penalty_scale * excess * excess
         return penalty
     
-    def orientation_penalty_x(self,q_current, penalty_scale=0.1):
+    def orientation_penalty_x(self,q_current, penalty_scale=0.1,threshold_rad = np.pi/18):
         """
         对当前姿态绕x轴（roll）的角度进行平方惩罚，目标是越接近0越好（不使用阈值）。
 
@@ -179,8 +179,10 @@ class ChargingTaskEnv(BaseEnv):
 
         q_current = F.normalize(q_current, dim=1)
         roll = quat_to_roll(q_current)
-
-        penalty = penalty_scale * roll ** 2
+        if np.fabs(roll) > threshold_rad:
+            penalty = penalty_scale * roll ** 2
+        else:
+            penalty = 0.0
         return penalty
     
     def step(self, action):
@@ -220,11 +222,11 @@ class ChargingTaskEnv(BaseEnv):
         # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
         #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
         # print("tcp pose: ",self.tcp.pose)
-        # show
-        self.control_force_vis.update_force(action) # 更新力可视化
-        self.state_force_vis.update_force(self.tcp_force) # 更新力可视化
-        self.control_force_vis.show() # 显示力可视化
-        self.state_force_vis.show() # 显示力可视化
+        # # show
+        # self.control_force_vis.update_force(action) # 更新力可视化
+        # self.state_force_vis.update_force(self.tcp_force) # 更新力可视化
+        # self.control_force_vis.show() # 显示力可视化
+        # self.state_force_vis.show() # 显示力可视化
         # self.image_vis.update(new_obs["pixels"]["front"],
         #                      new_obs["pixels"]["wrist"])
         self.render()
