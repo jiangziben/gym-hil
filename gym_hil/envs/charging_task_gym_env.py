@@ -26,9 +26,9 @@ class ChargingTaskEnv(BaseEnv):
         # 控制周期
         dt = 0.01
         # 控制参数
-        M_diag = [1, 1, 1, 0.05, 0.05, 0.05]
+        M_diag = [1, 1, 1, 0.5, 0.5, 0.5]
         D_diag = [100, 50, 50, 5, 5, 5]
-        K_diag = [0, 0, 0, 0, 0, 0]
+        K_diag = [20, 0, 0, 10, 10, 10]
         # 初始化阻抗控制器
         self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
         super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
@@ -50,7 +50,7 @@ class ChargingTaskEnv(BaseEnv):
             #                                                                         ]).shape, dtype=np.float32)
         })
         # self.control_force_vis = RealTimeForceVisualizer("control_force")
-        # self.state_force_vis = RealTimeForceVisualizer("state_force")
+        self.state_force_vis = RealTimeForceVisualizer("state_force")
         # self.image_vis = RealTimeImagePlotter("front", "wrist")
         
     def _load_agent(self, options: dict):
@@ -184,10 +184,10 @@ class ChargingTaskEnv(BaseEnv):
         else:
             penalty = 0.0
         return penalty
-    
+        
     def step(self, action):
         # print("action: ",action)
-        # action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
+        action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
         # new_action = action
         # self.control_input_sum += new_action[:3]
         # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
@@ -195,15 +195,13 @@ class ChargingTaskEnv(BaseEnv):
         # self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
         # print("new_action: ",new_action)
         # print("self.control_input_sum: ",self.control_input_sum)
-        x_desired = self.tcp.pose.get_p().cpu().numpy()[0] #期望位置，以tcp当前姿态为期望位置
-        q_desired = np.array([0,0,0,1],dtype=np.float32) #期望姿态
-        input_force = action[0:3] + self.tcp_force[0:3] #输入力
-        input_torque = action[3:6] + self.tcp_force[3:6] #输入力矩
+        input_force = self.tcp_force[0:3] #输入力
+        input_torque = self.tcp_force[3:6] #输入力矩
         self.admittance_controller.set_state(self.tcp.pose.get_p().cpu().numpy()[0],
                                              self.tcp.linear_velocity.cpu().numpy()[0],
                                              self.tcp.pose.get_q().cpu().numpy()[0],
                                              self.tcp.angular_velocity.cpu().numpy()[0])
-        new_action = self.admittance_controller.step(x_desired,q_desired,input_force,input_torque)
+        new_action = self.admittance_controller.step(action[0:3],action[3:6],input_force,input_torque)
         obs, reward, done,truncated, info = super().step(new_action[:6])
         # import time
         # start = time.time()
@@ -224,9 +222,9 @@ class ChargingTaskEnv(BaseEnv):
         # print("tcp pose: ",self.tcp.pose)
         # # show
         # self.control_force_vis.update_force(action) # 更新力可视化
-        # self.state_force_vis.update_force(self.tcp_force) # 更新力可视化
+        self.state_force_vis.update_force(self.tcp_force) # 更新力可视化
         # self.control_force_vis.show() # 显示力可视化
-        # self.state_force_vis.show() # 显示力可视化
+        self.state_force_vis.show() # 显示力可视化
         # self.image_vis.update(new_obs["pixels"]["front"],
         #                      new_obs["pixels"]["wrist"])
         self.render()

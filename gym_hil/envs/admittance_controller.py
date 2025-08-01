@@ -20,6 +20,7 @@ class AdmittanceController:
         self.q = R.from_quat([0,0,0,1])  # 姿态：scipy四元数对象
         self.w = np.zeros(3)  # 姿态角速度
         self.w_des = np.zeros(3)  # 姿态角位移（积分得到）
+        self.rpy_des = np.zeros(3)  # 期望姿态角（欧拉角）
 
     def reset(self, pose: np.ndarray):
         """
@@ -53,7 +54,12 @@ class AdmittanceController:
         else:
             return R_input
 
-    def step(self, x_des: np.ndarray, q_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
+    def compute_rotation_error(self, r_cur:R, r_ref:R):
+        delta_r = r_ref.inv() * r_cur
+        rotvec = delta_r.as_rotvec()  # 旋转向量
+        return rotvec
+    
+    def step(self, delta_x_des: np.ndarray, delta_rpy_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
         """
         输入：
             x_des: 期望位置 (3,)
@@ -64,20 +70,24 @@ class AdmittanceController:
             pose: 当前控制器更新后的7维 pose（位置 + 四元数）
         """
         # --- 线性导纳控制 ---
-        fx = force - self.D_pos @ self.dx #- self.K_pos @ (self.x - self.x_des)
+        self.x_des = self.x + delta_x_des
+        fx = force - self.D_pos @ self.dx - self.K_pos @ (self.x - self.x_des)
         ddx = np.linalg.inv(self.M_pos) @ fx
         dx = self.dx + ddx * self.dt
         # self.x_des += dx * self.dt
-        delta_x = dx * self.dt
+        x_des_new = self.x_des + dx * self.dt
+        delta_x_cmd = x_des_new - self.x  # 计算位置增量
 
-        # --- 姿态导纳控制 ---
-        torque_feedback = torque - self.D_ori @ self.w #- self.K_ori @ q_err
+        # # --- 姿态导纳控制 ---
+        # quat_des = np.array([0,0,0,1],dtype=np.float64) #self.q.as_euler("xyz", degrees=False) + delta_rpy_des
+        # r_des = R.from_quat(quat_des)  # 期望四元数
+        self.rpy_des += delta_rpy_des
+        r_des = R.from_euler('xyz', self.rpy_des, degrees=False)  # 期望rpy
+        r_cur = self.q
+        rot_error = self.compute_rotation_error(r_cur=r_des, r_ref=r_cur)
+        torque_feedback = torque - self.D_ori @ self.w - self.K_ori @ rot_error
         dw = np.linalg.inv(self.M_ori) @ torque_feedback
         self.w += dw * self.dt
-        # self.w_des += self.w * self.dt  # 角速度积分得到角位移
-        # Rot = self.limit_rotation_vector(R.from_rotvec(self.w_des),self.q, np.pi/6) #计算rpy角（弧度）
-        # self.w_des = Rot.as_rotvec() #更新姿态
-        # rpy = Rot.as_euler("xyz", degrees=False)  # 转换为欧拉角（弧度）
-        delta_q = R.from_rotvec(self.w * self.dt)
-        delta_rpy = delta_q.as_euler("xyz", degrees=False)  # 转换为欧拉角（弧度）
-        return np.concatenate([delta_x, delta_rpy])
+        rotvec = R.from_rotvec(r_des.as_rotvec() + self.w * self.dt)  
+        delta_rpy_cmd = (rotvec.inv() * r_cur).as_euler("xyz", degrees=False)
+        return np.concatenate([delta_x_cmd, delta_rpy_cmd])

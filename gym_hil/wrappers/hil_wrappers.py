@@ -23,8 +23,8 @@ import numpy as np
 
 from gym_hil.mujoco_gym_env import MAX_GRIPPER_COMMAND
 
-# DEFAULT_EE_STEP_SIZE = {"x": 0.025, "y": 0.025, "z": 0.025}
-DEFAULT_EE_STEP_SIZE = {"x": 100.0, "y": 100.0, "z": 100.0, "rx": 10, "ry": 10, "rz": 10}
+DEFAULT_EE_STEP_SIZE = {"x": 0.025, "y": 0.025, "z": 0.025,"rx": 0.1, "ry": 0.1, "rz": 0.1}
+# DEFAULT_EE_STEP_SIZE = {"x": 100.0, "y": 100.0, "z": 100.0, "rx": 10, "ry": 10, "rz": 10}
 
 class GripperPenaltyWrapper(gym.Wrapper):
     def __init__(self, env, penalty=-0.05):
