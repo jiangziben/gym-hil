@@ -187,7 +187,7 @@ class ChargingTaskEnv(BaseEnv):
         
     def step(self, action):
         # print("action: ",action)
-        action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
+        # action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
         # new_action = action
         # self.control_input_sum += new_action[:3]
         # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum

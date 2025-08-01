@@ -59,7 +59,7 @@ class AdmittanceController:
         rotvec = delta_r.as_rotvec()  # 旋转向量
         return rotvec
     
-    def step(self, delta_x_des: np.ndarray, delta_rpy_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
+    def step(self, delta_x_des: np.ndarray, rpy_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
         """
         输入：
             x_des: 期望位置 (3,)
@@ -79,9 +79,7 @@ class AdmittanceController:
         delta_x_cmd = x_des_new - self.x  # 计算位置增量
 
         # # --- 姿态导纳控制 ---
-        # quat_des = np.array([0,0,0,1],dtype=np.float64) #self.q.as_euler("xyz", degrees=False) + delta_rpy_des
-        # r_des = R.from_quat(quat_des)  # 期望四元数
-        self.rpy_des += delta_rpy_des
+        self.rpy_des = np.clip(rpy_des,-np.pi/6, np.pi/6)
         r_des = R.from_euler('xyz', self.rpy_des, degrees=False)  # 期望rpy
         r_cur = self.q
         rot_error = self.compute_rotation_error(r_cur=r_des, r_ref=r_cur)

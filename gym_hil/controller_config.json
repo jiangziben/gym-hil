@@ -48,8 +48,8 @@
     "axis_inversion": {
       "left_x": true,
       "left_y": true,
-      "right_x": true,
-      "right_y": false
+      "right_x": false,
+      "right_y": true
     }
   },
   "PS4 Controller": {
