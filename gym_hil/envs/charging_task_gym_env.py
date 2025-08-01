@@ -228,9 +228,9 @@ class ChargingTaskEnv(BaseEnv):
         # self.image_vis.update(new_obs["pixels"]["front"],
         #                      new_obs["pixels"]["wrist"])
         self.render()
-        # # # 增加姿态惩罚
-        λ_orient = 0.1
-        reward = reward.float() - self.orientation_penalty_x(self.tcp.pose.q ,penalty_scale=λ_orient)
+        # # # # 增加姿态惩罚
+        # λ_orient = 0.1
+        # reward = reward.float() - self.orientation_penalty_x(self.tcp.pose.q ,penalty_scale=λ_orient)
             
         # print("reward: ",reward.float())
         # print("agent_pos: ",obs["agent"]["qpos"].cpu().numpy()[0])
