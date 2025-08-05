@@ -39,9 +39,8 @@ class ChargingTaskEnv(BaseEnv):
                 "front": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
                 "wrist": spaces.Box(low=0, high=255, shape=obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0].shape, dtype=np.uint8),
             }),
-            "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
-                                                                                    obs["agent"]["qvel"].cpu().numpy()[0],
-                                                                                    self.tcp.pose.raw_pose.cpu().numpy()[0],
+            "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([self.tcp.linear_velocity.cpu().numpy()[0],
+                                                                                    self.tcp.angular_velocity.cpu().numpy()[0],
                                                                                     self.tcp_force
                                                                                     ]).shape, dtype=np.float32)
             # "agent_pos": spaces.Box(low=-np.inf, high=np.inf, shape=np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],
@@ -64,13 +63,13 @@ class ChargingTaskEnv(BaseEnv):
         tmp.set_rpy([0, -np.pi / 2, -np.pi / 2])
         charging_socket_quat = tmp.get_q()
         charging_socket_pose = rand_pose(
-            xlim=[0.5,0.7],
-            ylim=[-0.1,0.1],
-            zlim=[0.6,0.8],
+            xlim=[0.51,0.52],
+            ylim=[-0.01,0.01],
+            zlim=[0.79,0.81],
             qpos=charging_socket_quat,
             ylim_prop=False,
-            rotate_rand=False,
-            rotate_lim=[0,0,0],
+            rotate_rand=True,
+            rotate_lim=[0.1,0.05,0.05],
         )
         # charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
         # charging_socket_pose.set_rpy([0,-np.pi/2,-np.pi/2])
@@ -90,8 +89,8 @@ class ChargingTaskEnv(BaseEnv):
         new_obs["pixels"] = {}
         new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
         new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-                                               self.tcp.pose.raw_pose.cpu().numpy()[0],
+        new_obs["agent_pos"] = np.concatenate([self.tcp.linear_velocity.cpu().numpy()[0],
+                                               self.tcp.angular_velocity.cpu().numpy()[0],
                                                self.tcp_force
                                                ])
         # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
@@ -188,13 +187,6 @@ class ChargingTaskEnv(BaseEnv):
     def step(self, action):
         # print("action: ",action)
         # action[3:6] = np.array([0,0,0],dtype=np.float32)  # 禁止转动
-        # new_action = action
-        # self.control_input_sum += new_action[:3]
-        # # # new_action[0:3] = self.tcp_init_pose[0][:3] + self.control_input_sum
-        # new_action[:3] = self.clip_action(self.tcp_init_pose[0][:3].cpu().numpy() + self.control_input_sum)
-        # self.control_input_sum = new_action[:3] - self.tcp_init_pose[0][:3].cpu().numpy()
-        # print("new_action: ",new_action)
-        # print("self.control_input_sum: ",self.control_input_sum)
         input_force = self.tcp_force[0:3] #输入力
         input_torque = self.tcp_force[3:6] #输入力矩
         self.admittance_controller.set_state(self.tcp.pose.get_p().cpu().numpy()[0],
@@ -203,23 +195,24 @@ class ChargingTaskEnv(BaseEnv):
                                              self.tcp.angular_velocity.cpu().numpy()[0])
         new_action = self.admittance_controller.step(action[0:3],action[3:6],input_force,input_torque)
         obs, reward, done,truncated, info = super().step(new_action[:6])
+
+        new_obs = {}
+        new_obs["pixels"] = {}
+        new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
+        new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
+        new_obs["agent_pos"] = np.concatenate([self.tcp.linear_velocity.cpu().numpy()[0],
+                                               self.tcp.angular_velocity.cpu().numpy()[0],
+                                               self.tcp_force])
+        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
+        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
+        # print("tcp pose: ",self.tcp.pose)
         # import time
         # start = time.time()
         self.tcp_force = self.compute_force_and_torque(self.scene, self.tcp)
         # used_time = time.time() - start
         # print("used time: ",used_time)
         # print(self.tcp_force)
-
-        new_obs = {}
-        new_obs["pixels"] = {}
-        new_obs["pixels"]["front"] = obs["sensor_data"]["front"]['rgb'].cpu().numpy()[0]
-        new_obs["pixels"]["wrist"] = obs["sensor_data"]["wrist"]['rgb'].cpu().numpy()[0]
-        new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-                                               self.tcp.pose.raw_pose.cpu().numpy()[0],
-                                               self.tcp_force])
-        # new_obs["agent_pos"] = np.concatenate([obs["agent"]["qpos"].cpu().numpy()[0],obs["agent"]["qvel"].cpu().numpy()[0],
-        #                                        self.tcp.pose.raw_pose.cpu().numpy()[0]])
-        # print("tcp pose: ",self.tcp.pose)
+        
         # # show
         # self.control_force_vis.update_force(action) # 更新力可视化
         self.state_force_vis.update_force(self.tcp_force) # 更新力可视化

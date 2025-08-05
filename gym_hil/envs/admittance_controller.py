@@ -74,12 +74,11 @@ class AdmittanceController:
         fx = force - self.D_pos @ self.dx - self.K_pos @ (self.x - self.x_des)
         ddx = np.linalg.inv(self.M_pos) @ fx
         dx = self.dx + ddx * self.dt
-        # self.x_des += dx * self.dt
         x_des_new = self.x_des + dx * self.dt
         delta_x_cmd = x_des_new - self.x  # 计算位置增量
 
         # # --- 姿态导纳控制 ---
-        self.rpy_des = np.clip(rpy_des,-np.pi/6, np.pi/6)
+        self.rpy_des = np.clip(rpy_des,-np.pi/36, np.pi/36)
         r_des = R.from_euler('xyz', self.rpy_des, degrees=False)  # 期望rpy
         r_cur = self.q
         rot_error = self.compute_rotation_error(r_cur=r_des, r_ref=r_cur)
