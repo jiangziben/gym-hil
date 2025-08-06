@@ -374,8 +374,6 @@ class GamepadController(InputController):
             z_input = self.joystick.get_axis(up_axis) - self.joystick.get_axis(down_axis)  # Up/Down for Z
 
             # Apply deadzone to avoid drift
-
-            # Apply deadzone to avoid drift
             x_input = 0 if abs(x_input) < self.deadzone else x_input
             y_input = 0 if abs(y_input) < self.deadzone else y_input
             z_input = 0 if abs(z_input) < self.deadzone else z_input
