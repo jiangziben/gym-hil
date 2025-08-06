@@ -22,6 +22,9 @@ class AdmittanceController:
         self.w_des = np.zeros(3)  # 姿态角位移（积分得到）
         self.rpy_des = np.zeros(3)  # 期望姿态角（欧拉角）
 
+        self.rpy_limits_min = np.array([-np.pi/6, -np.pi/6, -np.pi/6])  # 姿态角最小值
+        self.rpy_limits_max = np.array([np.pi/6, np.pi/6, np.pi/6])
+
     def reset(self, pose: np.ndarray):
         """
         pose: 7维，前3维为位置，后4维为四元数（wxyz）
@@ -59,6 +62,14 @@ class AdmittanceController:
         rotvec = delta_r.as_rotvec()  # 旋转向量
         return rotvec
     
+    def set_rpy_limits(self, rpy_limits_min: np.ndarray,rpy_limits_max: np.ndarray):
+        """
+        设置姿态角限制
+        rpy_limits: 3维数组，表示每个轴的最大旋转角度（弧度）
+        """
+        self.rpy_limits_min = rpy_limits_min
+        self.rpy_limits_max = rpy_limits_max
+
     def step(self, delta_x_des: np.ndarray, rpy_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
         """
         输入：
@@ -78,7 +89,7 @@ class AdmittanceController:
         delta_x_cmd = x_des_new - self.x  # 计算位置增量
 
         # # --- 姿态导纳控制 ---
-        self.rpy_des = np.clip(rpy_des,-np.pi/36, np.pi/36)
+        self.rpy_des = np.clip(rpy_des,self.rpy_limits_min, self.rpy_limits_max)
         r_des = R.from_euler('xyz', self.rpy_des, degrees=False)  # 期望rpy
         r_cur = self.q
         rot_error = self.compute_rotation_error(r_cur=r_des, r_ref=r_cur)

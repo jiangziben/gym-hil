@@ -22,13 +22,15 @@ class ChargingTaskEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["aubo_c5"]
 
     agent: Union[AuboC5]
-    def __init__(self, *args,robot_uids="aubo_c5",image_obs = True, **kwargs):
+    def __init__(self, *args,robot_uids="aubo_c5",image_obs = True,random_actor=False, **kwargs):
         # 控制周期
         dt = 0.01
         # 控制参数
         M_diag = [1, 1, 1, 0.5, 0.5, 0.5]
         D_diag = [100, 50, 50, 5, 5, 5]
         K_diag = [20, 0, 0, 10, 10, 10]
+        self.random_actor = random_actor
+
         # 初始化阻抗控制器
         self.admittance_controller = AdmittanceController(M_diag, D_diag, K_diag, dt)
         super().__init__(*args,robot_uids=robot_uids,reconfiguration_freq=1, **kwargs)
@@ -59,20 +61,22 @@ class ChargingTaskEnv(BaseEnv):
         self.tcp = self.agent.robot.find_link_by_name('charging_gun_Link')
         
     def _load_scene(self, options: dict):
-        tmp = sapien.Pose(p=[0,0,0])
-        tmp.set_rpy([0, -np.pi / 2, -np.pi / 2])
-        charging_socket_quat = tmp.get_q()
-        charging_socket_pose = rand_pose(
-            xlim=[0.51,0.52],
-            ylim=[-0.01,0.01],
-            zlim=[0.79,0.81],
-            qpos=charging_socket_quat,
-            ylim_prop=False,
-            rotate_rand=True,
-            rotate_lim=[0.1,0.05,0.05],
-        )
-        # charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
-        # charging_socket_pose.set_rpy([0,-np.pi/2,-np.pi/2])
+        if self.random_actor:
+            tmp = sapien.Pose(p=[0,0,0])
+            tmp.set_rpy([0, -np.pi / 2, -np.pi / 2])
+            charging_socket_quat = tmp.get_q()
+            charging_socket_pose = rand_pose(
+                xlim=[0.4,0.6],
+                ylim=[-0.1,0.1],
+                zlim=[0.65,0.85],
+                qpos=charging_socket_quat,
+                ylim_prop=False,
+                rotate_rand=True,
+                rotate_lim=[0.05,0.05,0.05],
+            )
+        else:
+            charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
+            charging_socket_pose.set_rpy([0,-np.pi/2,-np.pi/2])
 
         self.charging_socket,_ = create_glb(
             self.scene,
