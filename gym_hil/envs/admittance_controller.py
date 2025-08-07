@@ -96,6 +96,8 @@ class AdmittanceController:
         torque_feedback = torque - self.D_ori @ self.w - self.K_ori @ rot_error
         dw = np.linalg.inv(self.M_ori) @ torque_feedback
         self.w += dw * self.dt
-        rotvec = R.from_rotvec(r_des.as_rotvec() + self.w * self.dt)  
-        delta_rpy_cmd = (rotvec.inv() * r_cur).as_euler("xyz", degrees=False)
+        r_comp = R.from_rotvec(self.w * self.dt)
+        r_cmd = r_des * r_comp
+        # rotvec = R.from_rotvec(r_des.as_rotvec() + self.w * self.dt)  
+        delta_rpy_cmd = (r_cmd.inv() * r_cur).as_euler("xyz", degrees=False)
         return np.concatenate([delta_x_cmd, delta_rpy_cmd])

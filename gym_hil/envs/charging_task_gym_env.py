@@ -28,7 +28,7 @@ class ChargingTaskEnv(BaseEnv):
         # 控制参数
         M_diag = [1, 1, 1, 0.5, 0.5, 0.5]
         D_diag = [100, 50, 50, 5, 5, 5]
-        K_diag = [20, 0, 0, 10, 10, 10]
+        K_diag = [20, 0, 0, 1, 1, 1]
         self.random_actor = random_actor
 
         # 初始化阻抗控制器
@@ -72,7 +72,7 @@ class ChargingTaskEnv(BaseEnv):
                 qpos=charging_socket_quat,
                 ylim_prop=False,
                 rotate_rand=True,
-                rotate_lim=[0.05,0.05,0.05],
+                rotate_lim=[0.1,0.05,0.05],
             )
         else:
             charging_socket_pose = sapien.Pose([0.5, 0.0, 0.8])
