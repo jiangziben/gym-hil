@@ -22,7 +22,7 @@ class ChargingTaskEnv(BaseEnv):
     SUPPORTED_ROBOTS = ["aubo_c5"]
 
     agent: Union[AuboC5]
-    def __init__(self, *args,robot_uids="aubo_c5",image_obs = True,random_actor=False, **kwargs):
+    def __init__(self, *args,robot_uids="aubo_c5",image_obs = True,random_actor=False,random_background=False, **kwargs):
         # 控制周期
         dt = 0.01
         # 控制参数

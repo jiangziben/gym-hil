@@ -253,8 +253,8 @@ class KeyboardController(InputController):
 class GamepadController(InputController):
     """Generate motion deltas from gamepad input."""
 
-    def __init__(self, x_step_size=0.01, y_step_size=0.01, z_step_size=0.01,
-                 roll_step_size=0.01, pitch_step_size=0.01, yaw_step_size=0.01,
+    def __init__(self, x_step_size=1.0, y_step_size=1.0, z_step_size=1.0,
+                 roll_step_size=1.0, pitch_step_size=1.0, yaw_step_size=1.0,
                  deadzone=0.01, config_path=None):
         super().__init__(x_step_size, y_step_size, z_step_size, roll_step_size, pitch_step_size, yaw_step_size)
         self.deadzone = deadzone
@@ -371,7 +371,7 @@ class GamepadController(InputController):
             # Read joystick axes
             x_input = self.joystick.get_axis(left_x_axis)  # Left/Right
             y_input = self.joystick.get_axis(left_y_axis)  # Up/Down
-            z_input = self.joystick.get_axis(up_axis) - self.joystick.get_axis(down_axis)  # Up/Down for Z
+            z_input = (self.joystick.get_axis(up_axis) - self.joystick.get_axis(down_axis)) * 0.5  # Up/Down for Z
 
             # Apply deadzone to avoid drift
             x_input = 0 if abs(x_input) < self.deadzone else x_input

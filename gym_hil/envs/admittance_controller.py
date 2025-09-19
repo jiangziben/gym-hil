@@ -71,15 +71,6 @@ class AdmittanceController:
         self.rpy_limits_max = rpy_limits_max
 
     def step(self, delta_x_des: np.ndarray, rpy_des: np.ndarray, force: np.ndarray, torque: np.ndarray):
-        """
-        输入：
-            x_des: 期望位置 (3,)
-            q_des: 期望四元数 (4,) -> [x, y, z, w]
-            force: 传感器测得的外力 (3,)
-            torque: 传感器测得的外力矩 (3,)
-        返回：
-            pose: 当前控制器更新后的7维 pose（位置 + 四元数）
-        """
         # --- 线性导纳控制 ---
         self.x_des = self.x + delta_x_des
         fx = force - self.D_pos @ self.dx - self.K_pos @ (self.x - self.x_des)

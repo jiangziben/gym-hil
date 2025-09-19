@@ -118,7 +118,7 @@ class InputsControlWrapper(gym.Wrapper):
         env,
         x_step_size=1.0,
         y_step_size=1.0,
-        z_step_size=0.5,
+        z_step_size=1.0,
         roll_step_size=1.0,
         pitch_step_size=1.0,
         yaw_step_size=1.0,
